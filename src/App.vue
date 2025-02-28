@@ -63,7 +63,7 @@ const user = ref(null)
 const publicRef = collection(db, 'things')
 const privateItemsRef = uid => collection(db, `users/${uid}/things`)
 const newThingName = ref('')
-const isPublic = ref(false)
+const isPublic = ref(true)
 
 const loginWithGoogle = async () => {
 	const provider = new GoogleAuthProvider()
