@@ -1,6 +1,6 @@
 <template>
 	<p class="things-title">{{ props.title }}</p>
-	<ul class="things-list">
+	<ul class="things-list" v-if="props.items.length !== 0">
 		<li
 			v-for="item in props.items"
 			:key="item.id"
@@ -8,7 +8,13 @@
 			@mousemove="setShowDate(item.id, true)"
 			@mouseout="setShowDate(item.id, false)"
 		>
-			<span class="thing-name">{{ item.name }}</span>
+			<div class="avatar-container">
+				<img :src="item.avatar" class="avatar" />
+				<div>
+					<div class="thing-name">{{ item.name }}</div>
+					<div class="user-name">by {{ item.user_name }}</div>
+				</div>
+			</div>
 			<div class="date" v-show="shownDates[item.id]">
 				{{ formatFirestoreDate(item.createdAt) }}
 			</div>
@@ -20,6 +26,7 @@
 			</div>
 		</li>
 	</ul>
+	<div class="empty" v-else>There's nothing here yet! Create something!</div>
 </template>
 
 <script setup>
@@ -112,5 +119,29 @@ const formatFirestoreDate = timestamp => {
 .date {
 	font-size: 14px;
 	color: #4b5563c0;
+}
+.avatar {
+	height: 40px;
+	overflow: hidden;
+	border-radius: 50%;
+}
+.avatar-container {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+.empty {
+	text-align: center;
+	margin-top: 20px;
+	color: #4b5563c0;
+	font-size: 18px;
+}
+.user-name {
+	color: #4b5563c0;
+	font-size: 14px;
+}
+.thing-name {
+	font-weight: bold;
+	font-size: 16px;
 }
 </style>

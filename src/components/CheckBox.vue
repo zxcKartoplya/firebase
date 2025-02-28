@@ -13,7 +13,7 @@ const props = defineProps({
 	text: String,
 })
 
-const model = ref(false)
+const model = defineModel()
 </script>
 
 <style scoped>

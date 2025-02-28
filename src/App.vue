@@ -1,25 +1,31 @@
 <template>
 	<div class="container">
 		<button @click="loginWithGoogle" v-if="!user" class="btn">
-			Войти с Google
+			Log in with Google
 		</button>
-		<button @click="logout" v-else class="btn">Выйти</button>
+		<button @click="logout" v-else class="btn">Logout</button>
 		<div v-if="user" class="user-info">
-			<h3 class="greeting">Привет, {{ user.displayName }}!</h3>
+			<h3 class="greeting">Hello, {{ user.displayName }}!</h3>
 			<p class="user-id">Id: {{ user.uid }}</p>
 			<div class="addInput">
 				<input
 					type="text"
 					v-model="newThingName"
-					placeholder="Add things"
+					placeholder="Add thing"
 					class="input"
 				/>
-				<button @click="addThings" class="btn">Добавить</button>
+				<button @click="addThings" class="btn">Add</button>
 			</div>
-			<CheckBox text="Для всех" />
+			<CheckBox text="For all users" v-model="isPublic" />
 			<CustomList
 				title="Things community"
-				:items="items"
+				:items="publicItems"
+				@edit="editThing"
+				@delete="deleteThing"
+			/>
+			<CustomList
+				title="Private things"
+				:items="privateItems"
 				@edit="editThing"
 				@delete="deleteThing"
 			/>
@@ -51,10 +57,13 @@ import { onMounted, ref } from 'vue'
 import { db } from './firebase'
 
 const auth = getAuth()
-const items = ref([])
+const publicItems = ref([])
+const privateItems = ref([])
 const user = ref(null)
-const thingsRef = collection(db, 'things')
+const publicRef = collection(db, 'things')
+const privateItemsRef = uid => collection(db, `users/${uid}/things`)
 const newThingName = ref('')
+const isPublic = ref(false)
 
 const loginWithGoogle = async () => {
 	const provider = new GoogleAuthProvider()
@@ -75,12 +84,28 @@ const logout = async () => {
 }
 
 const addThings = async () => {
+	if (!newThingName.value.trim()) {
+		return
+	}
+
 	try {
-		await addDoc(thingsRef, {
-			uid: user.value.uid,
-			name: newThingName.value,
-			createdAt: serverTimestamp(),
-		})
+		if (isPublic.value) {
+			await addDoc(publicRef, {
+				name: newThingName.value,
+				createdAt: serverTimestamp(),
+				avatar: user.value.photoURL,
+				user_name: user.value.displayName,
+			})
+		} else {
+			const privateRef = privateItemsRef(user.value.uid)
+			await addDoc(privateRef, {
+				name: newThingName.value,
+				uid: user.value.uid,
+				createdAt: serverTimestamp(),
+				avatar: user.value.photoURL,
+				user_name: user.value.displayName,
+			})
+		}
 		newThingName.value = ''
 		await loadThings()
 	} catch (error) {
@@ -91,7 +116,10 @@ const addThings = async () => {
 const editThing = async item => {
 	const newName = prompt('Введите новое имя для item:', item.name)
 	if (newName) {
-		const itemDoc = doc(thingsRef, item.id)
+		const itemDoc = isPublic.value
+			? doc(publicRef, item.id)
+			: doc(privateItemsRef(user.value.uid), item.id)
+
 		try {
 			await updateDoc(itemDoc, { name: newName })
 			await loadThings()
@@ -102,8 +130,10 @@ const editThing = async item => {
 }
 
 const deleteThing = async id => {
-	console.log(id)
-	const itemDoc = doc(thingsRef, id)
+	const itemDoc = isPublic.value
+		? doc(publicRef, id)
+		: doc(privateItemsRef(user.value.uid), id)
+
 	try {
 		await deleteDoc(itemDoc)
 		await loadThings()
@@ -113,14 +143,34 @@ const deleteThing = async id => {
 }
 
 const loadThings = async () => {
-	const querySnapshot = await getDocs(thingsRef)
-	items.value = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+	try {
+		const publicSnapshot = await getDocs(publicRef)
+		publicItems.value = publicSnapshot.docs.map(doc => ({
+			id: doc.id,
+			...doc.data(),
+		}))
+
+		if (user.value) {
+			const privateSnapshot = await getDocs(privateItemsRef(user.value.uid))
+			privateItems.value = privateSnapshot.docs.map(doc => ({
+				id: doc.id,
+				...doc.data(),
+			}))
+		}
+	} catch (error) {
+		console.error('Ошибка при загрузке вещей:', error)
+	}
 }
 
 onMounted(() => {
 	onAuthStateChanged(auth, currentUser => {
 		user.value = currentUser
-		loadThings()
+		if (user.value) {
+			loadThings()
+		} else {
+			publicItems.value = []
+			privateItems.value = []
+		}
 	})
 })
 </script>
